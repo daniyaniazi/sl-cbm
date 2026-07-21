@@ -18,7 +18,10 @@ import torch.optim as optim
 from torchvision import datasets
 import torchvision.transforms as transforms
 
-from autoattack import AutoAttack
+try:
+    from autoattack import AutoAttack
+except ImportError:
+    AutoAttack = None
 
 from pcbm.learn_concepts_multimodal import *
 from pcbm.data import get_dataset
