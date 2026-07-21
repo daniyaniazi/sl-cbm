@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-PYTHON="/home/dani00003/.venvs/guide/bin/python"
+PYTHON="/home/dani00003/.venvs/sl-cbm/bin/python"
 SLCBM_DIR="/home/dani00003/sl-cbm"
 RESNET_CUB_DIR="$SLCBM_DIR/model_zoo/resnet_cub"
 
