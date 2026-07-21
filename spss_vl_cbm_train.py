@@ -30,7 +30,11 @@ from pcbm.models import PosthocLinearCBM, get_model
 
 from captum.attr import visualization, GradientAttribution, LayerAttribution
 from utils import *
-from asgt import robust_training, ASGT_Legacy
+try:
+    from asgt import robust_training, ASGT_Legacy
+except ImportError:
+    robust_training = None
+    ASGT_Legacy = None
 
 from torchvision import datasets, transforms
 
