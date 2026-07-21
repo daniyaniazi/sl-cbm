@@ -846,6 +846,55 @@ def load_backbone(
         backbone_res.preprocess = transforms.Compose(preprocess.transforms[:-1])
         backbone_res.additional_components["model_top"] = model_top
 
+    elif args.backbone_name == "resnet18_cream":
+        from torchvision.models import resnet18
+        from collections import OrderedDict
+
+        model = resnet18()
+        model.fc = nn.Linear(512, 200)
+        state_dict = torch.load(args.backbone_ckpt, map_location="cpu")
+        model.load_state_dict(state_dict)
+
+        # Wrap torchvision ResNet18 to match pytorchcv children structure
+        # ResNetBottom expects children()[0]=features, children()[1]=classifier
+        class TorchvisionResNetWrapper(nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                children = list(model.children())
+                self.features = nn.Sequential(OrderedDict([
+                    ('conv1',   children[0]),
+                    ('bn1',     children[1]),
+                    ('relu',    children[2]),
+                    ('maxpool', children[3]),
+                    ('layer1',  children[4]),
+                    ('layer2',  children[5]),
+                    ('layer3',  children[6]),
+                    ('layer4',  children[7]),
+                    ('avgpool', children[8]),
+                ]))
+                self.output = children[9]
+
+            def forward(self, x):
+                x = self.features(x)
+                x = torch.flatten(x, 1)
+                return self.output(x)
+
+        wrapped_model = TorchvisionResNetWrapper(model)
+        backbone, model_top = ResNetBottom(wrapped_model), ResNetTop(wrapped_model)
+        backbone.encode_image = lambda image: backbone(image)
+        preprocess = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+        backbone = backbone.to(args.device).eval()
+
+        backbone_res.backbone_model = backbone
+        backbone_res.normalizer = transforms.Compose(preprocess.transforms[-1:])
+        backbone_res.preprocess = transforms.Compose(preprocess.transforms[:-1])
+        backbone_res.additional_components["model_top"] = model_top
+
     elif args.backbone_name.lower() == "ham10000_inception":
         raise NotImplementedError
         from .derma_models import get_derma_model
