@@ -8,8 +8,8 @@ class dataset_constants:
     image_size:np.ndarray = np.array([3, 244, 244])
     CIFAR10_DIR:str = "data/CIFAR10"
     CIFAR100_DIR:str = "data/CIFAR100"
-    CUB_DATA_DIR:str = "data/CUB_DATASET/CUB_200_2011"
-    CUB_PROCESSED_DIR:str = "data/CUB_DATASET/class_attr_data_10"
+    CUB_DATA_DIR:str = "/home/dani00003/mCREAM/data/CUB/CUB_200_2011"
+    CUB_PROCESSED_DIR:str = "/home/dani00003/mCREAM/data/CUB/CUB_processed/class_attr_data_10"
     CELEBA_DIR:str = "data/"
     RIVAL10_DIR:str = "data/RIVAL10"
 
