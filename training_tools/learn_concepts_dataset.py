@@ -35,20 +35,22 @@ def main():
     args = config()
     n_samples = args.n_samples
 
-    backbone, preprocess = load_backbone(args)
+    backbone_res = load_backbone(args)
+    backbone = backbone_res.backbone_model
+    preprocess = backbone_res.preprocess
 
     concept_libs = {C: {} for C in args.C}
-    # Get the positive and negative loaders for each concept. 
-    
-    concept_loaders = get_concept_loaders(args.dataset_name, preprocess, n_samples=args.n_samples, batch_size=args.batch_size, 
+    # Get the positive and negative loaders for each concept.
+
+    concept_loaders = get_concept_loaders(args.dataset_name, preprocess, n_samples=args.n_samples, batch_size=args.batch_size,
                                           num_workers=args.num_workers, seed=args.seed)
-    
+
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     for concept_name, loaders in concept_loaders.items():
         pos_loader, neg_loader = loaders['pos'], loaders['neg']
         # Get CAV for each concept using positive/negative image split
-        cav_info = learn_concept_bank(pos_loader, neg_loader, backbone, n_samples, args.C, device="cuda")
+        cav_info = learn_concept_bank(pos_loader, neg_loader, backbone, n_samples, args.C, device=args.device)
         
         # Store CAV train acc, val acc, margin info for each regularization parameter and each concept
         for C in args.C:
