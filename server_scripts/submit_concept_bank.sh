@@ -15,6 +15,7 @@ echo "universe                = docker
 docker_image            = pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
 executable              = $PYTHON
 arguments               = training_tools/learn_concepts_dataset.py --backbone-name resnet18_cream --backbone-ckpt /home/dani00003/GUIDE-cbm-WIP/models/resnet18_finetuned.pth --dataset-name cub --out-dir concept_banks/ --C 0.1 --n-samples 100
+environment             = \"PYTHONPATH=/home/dani00003/sl-cbm:/home/dani00003/pcbm-module\"
 initialdir              = $SLCBM_DIR
 
 output                  = $SLCBM_DIR/logs/concept_bank.\$(ClusterId).\$(ProcId).out

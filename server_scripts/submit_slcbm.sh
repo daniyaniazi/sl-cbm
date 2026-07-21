@@ -16,15 +16,14 @@ set -euo pipefail
 
 PYTHON="/home/dani00003/.venvs/sl-cbm/bin/python"
 SLCBM_DIR="/home/dani00003/sl-cbm"
-RESNET_CUB_DIR="$SLCBM_DIR/model_zoo/resnet_cub"
 
 mkdir -p "$SLCBM_DIR/logs"
-mkdir -p "$RESNET_CUB_DIR"
 
 echo "universe                = docker
 docker_image            = pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
 executable              = $PYTHON
 arguments               = spss_vl_cbm_train.py --backbone-name resnet18_cream --backbone-ckpt /home/dani00003/GUIDE-cbm-WIP/models/resnet18_finetuned.pth --concept-bank concept_banks/cub_resnet18_cream_0.1_100.pkl --dataset spss_cub --target-dataset cub --pcbm-arch spss_pcbm --batch-size 8 --epoch 50 --lr 3e-4 --lambda1 1.0 --lambda2 1.0 --lambda3 5.0 --intervention
+environment             = \"PYTHONPATH=/home/dani00003/sl-cbm:/home/dani00003/pcbm-module\"
 initialdir              = $SLCBM_DIR
 
 output                  = $SLCBM_DIR/logs/slcbm_resnet18cub.\$(ClusterId).\$(ProcId).out
