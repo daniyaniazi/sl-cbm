@@ -11,7 +11,7 @@ from captum.attr import visualization, GradientAttribution, LayerAttribution
 
 from typing import *
 
-from asgt import attack_utils
+from . import attack_utils
 from .model_utils import *
 from .visual_utils import *
 
