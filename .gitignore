@@ -172,4 +172,5 @@ cython_debug/
 concept_banks.zip
 data_ckpt.zip
 pcbm-module/
-requirements-venv.txt
+requirements-venv.txt\
+logs/

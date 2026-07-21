@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-PYTHON="/home/dani00003/.venvs/sl-cbm/bin/python"
+PYTHON="/home/dani00003/miniconda3/envs/sl-cbm/bin/python"
 SLCBM_DIR="/home/dani00003/sl-cbm"
 
 mkdir -p "$SLCBM_DIR/logs"
