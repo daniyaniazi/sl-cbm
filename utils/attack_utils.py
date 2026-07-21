@@ -56,9 +56,6 @@ class ori_adv_pair:
     adversarial_X:torch.Tensor
 
 def evaluate_adversarial_sample(ori_adv_context:ori_adv_pair, ):
-    print(f"Average L-inf norm: {torch.norm((ori_adv_context.original_X - ori_adv_context.adversarial_X), 
-                      p=float('inf'),
-                      dim=(1, 2, 3)).mean().item()}")
-    print(f"Average L-2 norm: {torch.norm((ori_adv_context.original_X - ori_adv_context.adversarial_X), 
-                      p=2,
-                      dim=(1, 2, 3)).mean().item()}")
+    diff = ori_adv_context.original_X - ori_adv_context.adversarial_X
+    print(f"Average L-inf norm: {torch.norm(diff, p=float('inf'), dim=(1, 2, 3)).mean().item()}")
+    print(f"Average L-2 norm: {torch.norm(diff, p=2, dim=(1, 2, 3)).mean().item()}")
