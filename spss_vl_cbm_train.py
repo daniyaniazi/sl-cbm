@@ -306,14 +306,15 @@ def main(args: argparse.Namespace):
     else:
         target_dataset = dataset
 
-    eval_model_explainability(
-        args,
-        model,
-        backbone.preprocess,
-        target_dataset,
-        concept_bank,
-        args.explain_method,
-    )
+    if args.explain_method is not None:
+        eval_model_explainability(
+            args,
+            model,
+            backbone.preprocess,
+            target_dataset,
+            concept_bank,
+            args.explain_method,
+        )
 
 
 if __name__ == "__main__":
