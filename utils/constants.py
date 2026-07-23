@@ -1,5 +1,8 @@
 import numpy as np
-from rival10 import RIVAL10_constants
+try:
+    from rival10 import RIVAL10_constants
+except ImportError:
+    RIVAL10_constants = None
 
 class CLIP_constants:
     pass

@@ -38,7 +38,10 @@ from models.spss_cbm import spss_pcbm
 from models.css_cbm import css_pcbm
 from models.clip_cbm import clip_cbm
 
-rival10.constants.RIVAL10_constants.set_rival10_dir(dataset_constants.RIVAL10_DIR)
+try:
+    rival10.constants.RIVAL10_constants.set_rival10_dir(dataset_constants.RIVAL10_DIR)
+except Exception:
+    pass
 
 
 def set_random_seed(seed):
