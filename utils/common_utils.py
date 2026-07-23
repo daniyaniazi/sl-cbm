@@ -717,8 +717,9 @@ def load_dataset(
                 return len(self.data)
 
             def __getitem__(self, idx):
+                from PIL import Image as PILImage
                 elem = self.data[idx]
-                img = Image.open(elem['img_path']).convert('RGB')
+                img = PILImage.open(elem['img_path']).convert('RGB')
                 if self.transform:
                     img = self.transform(img)
                 label = torch.tensor(elem['class_label'], dtype=torch.long)
