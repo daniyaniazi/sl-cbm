@@ -118,12 +118,25 @@ def main():
         num_workers=args.num_workers, seed=args.seed)
 
     concept_libs = {C: {} for C in args.C}
+    skipped = []
     for conc_name, loaders in concept_loaders.items():
-        print(f"  Learning CAV: {conc_name}")
-        cav_info = learn_concept_bank(loaders['pos'], loaders['neg'], backbone,
-                                      args.n_samples, args.C, device=args.device)
-        for C in args.C:
-            concept_libs[C][conc_name] = cav_info[C]
+        pos_size = len(loaders['pos'].dataset)
+        neg_size = len(loaders['neg'].dataset)
+        print(f"  [{conc_name}] pos={pos_size} neg={neg_size}", flush=True)
+        try:
+            cav_info = learn_concept_bank(loaders['pos'], loaders['neg'], backbone,
+                                          args.n_samples, args.C, device=args.device)
+            for C in args.C:
+                concept_libs[C][conc_name] = cav_info[C]
+                train_acc = cav_info[C][1]
+                val_acc   = cav_info[C][2]
+            print(f"    -> train_acc={train_acc:.3f}  val_acc={val_acc:.3f}", flush=True)
+        except Exception as e:
+            print(f"    [ERROR] {conc_name}: {e}", flush=True)
+            skipped.append(conc_name)
+
+    print(f"\nDone. Built {sum(len(v) for v in concept_libs.values())} CAVs, "
+          f"skipped {len(skipped)}: {skipped}", flush=True)
 
     os.makedirs(args.out_dir, exist_ok=True)
     for C in concept_libs:
