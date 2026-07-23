@@ -730,9 +730,11 @@ def load_dataset(
         testset  = AwA2Dataset(TEST_PKL,  transform=preprocess)
 
         train_loader = DataLoader(trainset, batch_size=args.batch_size,
-                                  shuffle=True, num_workers=args.num_workers)
+                                  shuffle=True, num_workers=args.num_workers,
+                                  drop_last=True)
         test_loader  = DataLoader(testset,  batch_size=args.batch_size,
-                                  shuffle=False, num_workers=args.num_workers)
+                                  shuffle=False, num_workers=args.num_workers,
+                                  drop_last=False)
 
         with open(os.path.join(dataset_constants.AWA2_PROCESSED_DIR, 'classes.txt')) as f:
             classes = [line.strip().split('\t')[1] for line in f.readlines()]
