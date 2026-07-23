@@ -141,7 +141,7 @@ def main():
     os.makedirs(args.out_dir, exist_ok=True)
     for C in concept_libs:
         lib_path = os.path.join(args.out_dir,
-                                f"awa2_{args.backbone_name}_{C}_{args.n_samples}.pkl")
+                                f"awa2_{args.backbone_name}_{C}_{2*args.n_samples}.pkl")
         with open(lib_path, 'wb') as f:
             pickle.dump(concept_libs[C], f)
         print(f"Saved: {lib_path} ({len(concept_libs[C])} concepts)")

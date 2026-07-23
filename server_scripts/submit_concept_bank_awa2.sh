@@ -30,7 +30,7 @@ requirements            = UidDomain == \"cs.uni-saarland.de\"
 queue 1" | condor_submit
 
 echo "AwA2 concept bank job submitted"
-echo "Output: $SLCBM_DIR/concept_banks/awa2_resnet101_imagenet_0.1_10.pkl"
+echo "Output: $SLCBM_DIR/concept_banks/awa2_resnet101_imagenet_0.1_20.pkl"
 echo "When done: ./server_scripts/submit_slcbm_awa2.sh"
 
 condor_q
