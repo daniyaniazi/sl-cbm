@@ -47,7 +47,7 @@ def get_awa2_concept_loaders(pkl_path, predicates_path, preprocess,
     np.random.seed(seed)
 
     with open(pkl_path, 'rb') as f:
-        all_data = pickle.load(f)
+        all_features = pickle.load(f)
 
     with open(predicates_path, 'r') as f:
         predicates = [line.strip() for line in f.readlines()]
@@ -55,8 +55,8 @@ def get_awa2_concept_loaders(pkl_path, predicates_path, preprocess,
     # Group images by concept presence (attribute_label[i] == 1)
     concept_loaders = {}
     for conc_idx, conc_name in enumerate(predicates):
-        pos_paths = [d['img_path'] for d in all_data if d['attribute_label'][conc_idx] == 1]
-        neg_paths = [d['img_path'] for d in all_data if d['attribute_label'][conc_idx] == 0]
+        pos_paths = [d['img_path'] for d in all_features if d['attribute_label'][conc_idx] == 1]
+        neg_paths = [d['img_path'] for d in all_features if d['attribute_label'][conc_idx] == 0]
 
         if len(pos_paths) < n_samples or len(neg_paths) < n_samples:
             print(f"  [SKIP] {conc_name}: not enough samples "
@@ -91,7 +91,7 @@ def config():
     parser.add_argument("--C", nargs="+", default=[0.1], type=float)
     parser.add_argument("--n-samples", default=50, type=int)
     parser.add_argument("--pkl-path", default=None, type=str,
-                        help="Path to all_data.pkl (default: AWA2_PROCESSED_DIR/all_data.pkl)")
+                        help="Path to all_features.pkl (default: AWA2_PROCESSED_DIR/all_features.pkl)")
     parser.add_argument("--predicates-path", default=None, type=str,
                         help="Path to predicates.txt (default: AWA2_PROCESSED_DIR/predicates.txt)")
     return parser.parse_args()
@@ -101,7 +101,7 @@ def config():
 def main():
     args = config()
     if args.pkl_path is None:
-        args.pkl_path = os.path.join(dataset_constants.AWA2_PROCESSED_DIR, 'all_data.pkl')
+        args.pkl_path = os.path.join(dataset_constants.AWA2_PROCESSED_DIR, 'all_features.pkl')
     if args.predicates_path is None:
         args.predicates_path = os.path.join(dataset_constants.AWA2_PROCESSED_DIR, 'predicates.txt')
 

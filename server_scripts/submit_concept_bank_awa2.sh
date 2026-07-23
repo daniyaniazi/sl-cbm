@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# Build concept bank for AwA2 using ResNet101 ImageNet backbone (auto-downloaded).
-# Run before submit_slcbm_awa2.sh
-#
-# USAGE:
-#   ./server_scripts/submit_concept_bank_awa2.sh
+# Build concept bank for AwA2 using ResNet101 ImageNet backbone.
+# Run before submit_slcbm_awa2.sh.
 
 set -euo pipefail
 
-PYTHON="/home/dani00003/.venvs/guide/bin/python"
+PYTHON="/home/dani00003/miniconda3/envs/sl-cbm/bin/python"
 SLCBM_DIR="/home/dani00003/sl-cbm"
 
 mkdir -p "$SLCBM_DIR/logs"
@@ -17,6 +14,7 @@ echo "universe                = docker
 docker_image            = pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
 executable              = $PYTHON
 arguments               = training_tools/learn_concepts_awa2.py --backbone-name resnet101_imagenet --backbone-ckpt none --out-dir concept_banks/ --C 0.1 --n-samples 50
+environment             = \"PYTHONPATH=/home/dani00003/pcbm-module:/home/dani00003/sl-cbm\"
 initialdir              = $SLCBM_DIR
 
 output                  = $SLCBM_DIR/logs/concept_bank_awa2.\$(ClusterId).\$(ProcId).out
@@ -28,9 +26,11 @@ request_CPUs            = 4
 request_memory          = 16G
 requirements            = UidDomain == \"cs.uni-saarland.de\"
 +WantGPUHomeMounted     = true
+
 queue 1" | condor_submit
 
 echo "AwA2 concept bank job submitted"
-echo "Output: concept_banks/awa2_resnet101_imagenet_0.1_50.pkl"
-echo "When done → run: ./server_scripts/submit_slcbm_awa2.sh"
+echo "Output: $SLCBM_DIR/concept_banks/awa2_resnet101_imagenet_0.1_50.pkl"
+echo "When done: ./server_scripts/submit_slcbm_awa2.sh"
+
 condor_q

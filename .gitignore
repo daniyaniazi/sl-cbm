@@ -174,3 +174,4 @@ data_ckpt.zip
 pcbm-module/
 requirements-venv.txt\
 logs/
+logs*/

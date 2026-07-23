@@ -2,7 +2,7 @@
 # SL-CBM on AwA2 with CREAM backbone.
 #
 # PREREQUISITES (run once before submitting):
-#   1. AwA2 images downloaded + all_data.pkl generated (see GUIDE-cbm-WIP AwA2 setup)
+#   1. AwA2 images downloaded + all_features.pkl generated (see GUIDE-cbm-WIP AwA2 setup)
 #   2. Build AwA2 concept bank (ResNet101 ImageNet weights, auto-downloaded):
 #      cd ~/sl-cbm
 #      python training_tools/learn_concepts_awa2.py \
@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-PYTHON="/home/dani00003/.venvs/guide/bin/python"
+PYTHON="/home/dani00003/miniconda3/envs/sl-cbm/bin/python"
 SLCBM_DIR="/home/dani00003/sl-cbm"
 mkdir -p "$SLCBM_DIR/logs"
 
