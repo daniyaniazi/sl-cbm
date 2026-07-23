@@ -38,7 +38,7 @@ class AwA2ConceptDataset(Dataset):
         img = Image.open(self.samples[idx]).convert('RGB')
         if self.transform:
             img = self.transform(img)
-        return img, 0  # label unused for concept learning
+        return img  # pcbm get_embeddings expects a plain tensor batch
 
 
 # ========================================================================
