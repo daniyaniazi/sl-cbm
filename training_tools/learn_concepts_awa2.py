@@ -58,19 +58,21 @@ def get_awa2_concept_loaders(pkl_path, predicates_path, preprocess,
         pos_paths = [d['img_path'] for d in all_features if d['attribute_label'][conc_idx] == 1]
         neg_paths = [d['img_path'] for d in all_features if d['attribute_label'][conc_idx] == 0]
 
-        if len(pos_paths) < n_samples or len(neg_paths) < n_samples:
+        # pcbm splits loader output into train (first n_samples) and val (next n_samples)
+        # so each loader must provide 2*n_samples images
+        if len(pos_paths) < 2 * n_samples or len(neg_paths) < 2 * n_samples:
             print(f"  [SKIP] {conc_name}: not enough samples "
-                  f"(pos={len(pos_paths)}, neg={len(neg_paths)})")
+                  f"(pos={len(pos_paths)}, neg={len(neg_paths)}, need {2*n_samples} each)")
             continue
 
         np.random.shuffle(pos_paths)
         np.random.shuffle(neg_paths)
 
         pos_loader = DataLoader(
-            AwA2ConceptDataset(pos_paths[:n_samples], preprocess),
+            AwA2ConceptDataset(pos_paths[:2 * n_samples], preprocess),
             batch_size=batch_size, shuffle=False, num_workers=num_workers)
         neg_loader = DataLoader(
-            AwA2ConceptDataset(neg_paths[:n_samples], preprocess),
+            AwA2ConceptDataset(neg_paths[:2 * n_samples], preprocess),
             batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
         concept_loaders[conc_name] = {'pos': pos_loader, 'neg': neg_loader}
