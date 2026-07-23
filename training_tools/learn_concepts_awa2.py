@@ -87,7 +87,7 @@ def config():
     parser.add_argument("--device", default="cuda", type=str)
     parser.add_argument("--seed", default=24, type=int)
     parser.add_argument("--num-workers", default=4, type=int)
-    parser.add_argument("--batch-size", default=100, type=int)
+    parser.add_argument("--batch-size", default=25, type=int)
     parser.add_argument("--C", nargs="+", default=[0.1], type=float)
     parser.add_argument("--n-samples", default=50, type=int)
     parser.add_argument("--pkl-path", default=None, type=str,
