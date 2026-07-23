@@ -13,7 +13,7 @@ mkdir -p "$SLCBM_DIR/concept_banks"
 echo "universe                = docker
 docker_image            = pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
 executable              = $PYTHON
-arguments               = training_tools/learn_concepts_awa2.py --backbone-name resnet101_imagenet --backbone-ckpt none --out-dir concept_banks/ --C 0.1 --n-samples 10
+arguments               = training_tools/learn_concepts_awa2.py --backbone-name resnet101_imagenet --backbone-ckpt none --out-dir concept_banks/ --C 0.1 --n-samples 118 --pkl-path /home/dani00003/GUIDE-cbm-WIP/data/AwA2/train_seed_44.pkl --predicates-path /home/dani00003/GUIDE-cbm-WIP/data/AwA2/predicates.txt
 environment             = \"PYTHONPATH=/home/dani00003/pcbm-module:/home/dani00003/sl-cbm\"
 initialdir              = $SLCBM_DIR
 
@@ -30,7 +30,7 @@ requirements            = UidDomain == \"cs.uni-saarland.de\"
 queue 1" | condor_submit
 
 echo "AwA2 concept bank job submitted"
-echo "Output: $SLCBM_DIR/concept_banks/awa2_resnet101_imagenet_0.1_20.pkl"
+echo "Output: $SLCBM_DIR/concept_banks/awa2_resnet101_imagenet_0.1_236.pkl"
 echo "When done: ./server_scripts/submit_slcbm_awa2.sh"
 
 condor_q

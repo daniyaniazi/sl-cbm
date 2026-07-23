@@ -93,7 +93,7 @@ def config():
     parser.add_argument("--C", nargs="+", default=[0.1], type=float)
     parser.add_argument("--n-samples", default=50, type=int)
     parser.add_argument("--pkl-path", default=None, type=str,
-                        help="Path to all_features.pkl (default: AWA2_PROCESSED_DIR/all_features.pkl)")
+                        help="Path to train pkl (default: AWA2_PROCESSED_DIR/train_seed_44.pkl)")
     parser.add_argument("--predicates-path", default=None, type=str,
                         help="Path to predicates.txt (default: AWA2_PROCESSED_DIR/predicates.txt)")
     return parser.parse_args()
@@ -103,7 +103,7 @@ def config():
 def main():
     args = config()
     if args.pkl_path is None:
-        args.pkl_path = os.path.join(dataset_constants.AWA2_PROCESSED_DIR, 'all_features.pkl')
+        args.pkl_path = os.path.join(dataset_constants.AWA2_PROCESSED_DIR, 'train_seed_44.pkl')
     if args.predicates_path is None:
         args.predicates_path = os.path.join(dataset_constants.AWA2_PROCESSED_DIR, 'predicates.txt')
 
