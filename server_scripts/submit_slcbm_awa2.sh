@@ -24,7 +24,8 @@ mkdir -p "$SLCBM_DIR/logs"
 echo "universe                = docker
 docker_image            = pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
 executable              = $PYTHON
-arguments               = spss_vl_cbm_train.py --backbone-name resnet101_imagenet --backbone-ckpt none --concept-bank concept_banks/awa2_resnet101_imagenet_0.1_50.pkl --dataset spss_awa2 --target-dataset spss_awa2 --pcbm-arch spss_pcbm --batch-size 8 --epoch 50 --lr 3e-4 --lambda1 1.0 --lambda2 1.0 --lambda3 5.0 --intervention
+arguments               = spss_vl_cbm_train.py --backbone-name resnet101_imagenet --backbone-ckpt none --concept-bank concept_banks/awa2_resnet101_imagenet_0.1_236.pkl --dataset spss_awa2 --target-dataset spss_awa2 --pcbm-arch spss_pcbm --batch-size 8 --epoch 50 --lr 3e-4 --lambda1 1.0 --lambda2 1.0 --lambda3 5.0 --intervention --explain-method builtin_explain
+environment             = "PYTHONPATH=/home/dani00003/sl-cbm:/home/dani00003/pcbm-module"
 initialdir              = $SLCBM_DIR
 
 output                  = $SLCBM_DIR/logs/slcbm_awa2_cream.\$(ClusterId).\$(ProcId).out
