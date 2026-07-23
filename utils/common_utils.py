@@ -693,6 +693,51 @@ def load_dataset(
         
         train_loader = None
         test_loader = DataLoader(wrapped_celebA(testset), batch_size=args.batch_size, shuffle=False, num_workers=16)
+
+    elif args.dataset == "spss_awa2":
+        import pickle
+        from torch.utils.data import Dataset
+
+        num_classes = 50
+        num_concepts = 85
+
+        TRAIN_PKL = os.path.join(dataset_constants.AWA2_PROCESSED_DIR, "train_seed_44.pkl")
+        TEST_PKL  = os.path.join(dataset_constants.AWA2_PROCESSED_DIR, "test_seed_44.pkl")
+
+        class AwA2Dataset(Dataset):
+            def __init__(self, pkl_path, transform=None):
+                with open(pkl_path, 'rb') as f:
+                    self.data = pickle.load(f)
+                self.transform = transform
+
+            def __len__(self):
+                return len(self.data)
+
+            def __getitem__(self, idx):
+                elem = self.data[idx]
+                img = Image.open(elem['img_path']).convert('RGB')
+                if self.transform:
+                    img = self.transform(img)
+                label = torch.tensor(elem['class_label'], dtype=torch.long)
+                attrs = torch.tensor(elem['attribute_label'], dtype=torch.float32)
+                return img, label, attrs
+
+        trainset = AwA2Dataset(TRAIN_PKL, transform=preprocess)
+        testset  = AwA2Dataset(TEST_PKL,  transform=preprocess)
+
+        train_loader = DataLoader(trainset, batch_size=args.batch_size,
+                                  shuffle=True, num_workers=args.num_workers)
+        test_loader  = DataLoader(testset,  batch_size=args.batch_size,
+                                  shuffle=False, num_workers=args.num_workers)
+
+        with open(os.path.join(dataset_constants.AWA2_PROCESSED_DIR, 'classes.txt')) as f:
+            classes = [line.strip().split('\t')[1] for line in f.readlines()]
+        class_to_idx = {c: i for i, c in enumerate(classes)}
+        idx_to_class = {i: c for i, c in enumerate(classes)}
+        print(num_classes, "num classes for awa2")
+        print(len(trainset), "training set size")
+        print(len(testset), "test set size")
+
     else:
         raise ValueError(args.dataset)
 
@@ -880,6 +925,50 @@ def load_backbone(
                 return self.output(x)
 
         wrapped_model = TorchvisionResNetWrapper(model)
+        backbone, model_top = ResNetBottom(wrapped_model), ResNetTop(wrapped_model)
+        backbone.encode_image = lambda image: backbone(image)
+        preprocess = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+        backbone = backbone.to(args.device).eval()
+
+        backbone_res.backbone_model = backbone
+        backbone_res.normalizer = transforms.Compose(preprocess.transforms[-1:])
+        backbone_res.preprocess = transforms.Compose(preprocess.transforms[:-1])
+        backbone_res.additional_components["model_top"] = model_top
+
+    elif args.backbone_name == "resnet101_imagenet":
+        from torchvision.models import resnet101, ResNet101_Weights
+        from collections import OrderedDict
+
+        model = resnet101(weights=ResNet101_Weights.IMAGENET1K_V1)
+
+        class TorchvisionResNet101Wrapper(nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                children = list(model.children())
+                self.features = nn.Sequential(OrderedDict([
+                    ('conv1',   children[0]),
+                    ('bn1',     children[1]),
+                    ('relu',    children[2]),
+                    ('maxpool', children[3]),
+                    ('layer1',  children[4]),
+                    ('layer2',  children[5]),
+                    ('layer3',  children[6]),
+                    ('layer4',  children[7]),
+                    ('avgpool', children[8]),
+                ]))
+                self.output = children[9]
+
+            def forward(self, x):
+                x = self.features(x)
+                x = torch.flatten(x, 1)
+                return self.output(x)
+
+        wrapped_model = TorchvisionResNet101Wrapper(model)
         backbone, model_top = ResNetBottom(wrapped_model), ResNetTop(wrapped_model)
         backbone.encode_image = lambda image: backbone(image)
         preprocess = transforms.Compose([

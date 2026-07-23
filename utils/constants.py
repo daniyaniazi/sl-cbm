@@ -10,6 +10,8 @@ class dataset_constants:
     CIFAR100_DIR:str = "data/CIFAR100"
     CUB_DATA_DIR:str = "/home/dani00003/mCREAM/data/CUB/CUB_200_2011"
     CUB_PROCESSED_DIR:str = "/home/dani00003/mCREAM/data/CUB/CUB_processed/class_attr_data_10"
+    AWA2_DATA_DIR:str = "/home/dani00003/Animals_with_Attributes2/JPEGImages"
+    AWA2_PROCESSED_DIR:str = "/home/dani00003/GUIDE-cbm-WIP/data/AwA2"
     CELEBA_DIR:str = "data/"
     RIVAL10_DIR:str = "data/RIVAL10"
 
