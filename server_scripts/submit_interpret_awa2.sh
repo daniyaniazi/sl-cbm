@@ -16,7 +16,7 @@ PYTHON="/home/dani00003/miniconda3/envs/sl-cbm/bin/python"
 SLCBM_DIR="/home/dani00003/sl-cbm"
 
 # ── UPDATE THIS after training finishes ──────────────────────────────────────
-CKPT="$SLCBM_DIR/outputs/REPLACE_WITH_AWA2_TIMESTAMP/trainable_weights.pt"
+CKPT="$SLCBM_DIR/outputs/20260723180418/trainable_weights.pt"
 # ─────────────────────────────────────────────────────────────────────────────
 
 CONCEPT_BANK="$SLCBM_DIR/concept_banks/awa2_resnet101_imagenet_0.1_236.pkl"

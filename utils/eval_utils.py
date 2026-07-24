@@ -974,6 +974,10 @@ def eval_model_explainability(
             eval_intervention(
                 args, concept_bank, ["ag", "rand", "lcp", "ucp", "cctp"], dataset.test_loader, model, [1, 2, 3, 4, 5, 6, 7, 999], eval_save_to
             )
+        elif "awa2" in args.target_dataset:
+            eval_intervention(
+                args, concept_bank, ["ag", "rand", "lcp", "ucp", "cctp"], dataset.test_loader, model, [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 85, 999], eval_save_to
+            )
 
     val_acc, val_concept_acc = val_one_epoch(dataset.test_loader, model, args.device)
 
@@ -992,6 +996,8 @@ def eval_model_explainability(
     elif "celebA" in args.target_dataset:
         eval_nec(args, dataset.test_loader, model, [5, 7], eval_save_to)
     elif "cub" in args.target_dataset:
+        eval_nec(args, dataset.test_loader, model, [5, 10, 15, 20, 25, 30], eval_save_to)
+    elif "awa2" in args.target_dataset:
         eval_nec(args, dataset.test_loader, model, [5, 10, 15, 20, 25, 30], eval_save_to)
 
 
