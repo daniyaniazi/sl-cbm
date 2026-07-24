@@ -79,6 +79,12 @@ class concept_select_func:
                 concept_target:str):
         targeted_concept_idx = model_context.concept_bank.concept_names.index(concept_target)
         return targeted_concept_idx
+
+    @staticmethod
+    def awa2(model_context: model_pipeline,
+             concept_target: str):
+        # AwA2 concepts are single named attributes (e.g. "black", "furry")
+        return model_context.concept_bank.concept_names.index(concept_target)
     
     
 def main(args:argparse.Namespace):
