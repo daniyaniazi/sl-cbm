@@ -52,7 +52,8 @@ def config():
     parser.add_argument("--exp-name", default=str(datetime.now().strftime("%Y%m%d%H%M%S")), type=str)
     parser.add_argument('--save-100-local', action='store_true')
     parser.add_argument('--zip', action='store_true')
-
+    parser.add_argument('--sample-ids', default=None, type=str,
+                        help="Path to txt file with image IDs (one per line). Only these images are processed.")
 
     return parser.parse_args()
 
@@ -92,21 +93,35 @@ def main(args:argparse.Namespace):
     concept_bank, backbone, dataset, model_context, model = load_model_pipeline(args)
     model.eval()
 
-    explain_algorithm:GradientAttribution = getattr(model_explain_algorithm_factory, 
+    explain_algorithm:GradientAttribution = getattr(model_explain_algorithm_factory,
                                                     args.explain_method)(forward_func=model.encode_as_concepts,
                                                                         model = model)
     explain_algorithm_forward:Callable = getattr(model_explain_algorithm_forward, args.explain_method)
     attribution_pooling:Callable[..., torch.Tensor] = getattr(attribution_pooling_forward, args.concept_pooling)
     targeted_concept_idx = getattr(concept_select_func, args.dataset)(model_context, args.concept_target)
     args.logger.info(targeted_concept_idx)
-    
+
+    # load sample ID filter if provided
+    sample_ids = None
+    if args.sample_ids is not None:
+        with open(args.sample_ids) as f:
+            sample_ids = set(line.strip() for line in f if line.strip())
+        args.logger.info(f"Filtering to {len(sample_ids)} sample IDs from {args.sample_ids}")
+
     count = 0
-    for idx, data in tqdm(enumerate(dataset.test_loader), 
+    for idx, data in tqdm(enumerate(dataset.test_loader),
                           total=dataset.test_loader.__len__()):
         batch_X, batch_Y = data
         batch_X:torch.Tensor = batch_X.to(args.device)
         batch_Y:torch.Tensor = batch_Y.to(args.device)
-        
+
+        # filter by sample ID — match filename stem against provided list
+        if sample_ids is not None:
+            img_path = dataset.test_loader.dataset.samples[idx][0]
+            img_id = os.path.splitext(os.path.basename(img_path))[0]
+            if img_id not in sample_ids:
+                continue
+
         if args.class_target != "" and dataset.idx_to_class[batch_Y.item()] != args.class_target:
             continue
         
