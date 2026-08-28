@@ -128,12 +128,21 @@ class model_explain_algorithm_factory:
                 last_blocks = image_attn_blocks[-1].ln_1
                 layer_grad_cam = LayerGradCam(forward_func,
                                                 last_blocks)
-            
         elif isinstance(backbone, ResNetBottom):
-            layer_grad_cam = LayerGradCam(forward_func,
-                                          backbone.get_submodule("features.stage4"))
-            # layer_grad_cam = LayerGradCam(posthoc_concept_net,
-            #                               backbone.get_submodule("features.stage4.unit2.body.conv2.conv"))
+            try:
+                target_layer = backbone.get_submodule("features.stage4")
+            except AttributeError:
+                target_layer = backbone.get_submodule("features.layer4")
+
+            layer_grad_cam = LayerGradCam(
+                forward_func,
+                target_layer
+            )    
+        # elif isinstance(backbone, ResNetBottom):
+        #     layer_grad_cam = LayerGradCam(forward_func,
+        #                                   backbone.get_submodule("features.stage4"))
+        #     # layer_grad_cam = LayerGradCam(posthoc_concept_net,
+        #     #                               backbone.get_submodule("features.stage4.unit2.body.conv2.conv"))
         else:
             raise NotImplementedError
         
@@ -246,18 +255,33 @@ class model_explain_algorithm_forward:
 
 class attribution_pooling_forward:
     
+    # @staticmethod
+    # def max_pooling_class_wise(batch_X:torch.Tensor,
+    #                            attributions:torch.Tensor,
+    #                            concept_idx:Union[torch.Tensor, int],
+    #                            pcbm_net:CBM_Net):
+    #     if isinstance(concept_idx, int):
+    #         return attributions.squeeze(0)
+        
+    #     with torch.no_grad():
+    #         max_concept_idx = pcbm_net(batch_X)[0, concept_idx].argmax()
+    #     return attributions[max_concept_idx]
+    
     @staticmethod
-    def max_pooling_class_wise(batch_X:torch.Tensor,
-                               attributions:torch.Tensor,
-                               concept_idx:Union[torch.Tensor, int],
-                               pcbm_net:CBM_Net):
+    def max_pooling_class_wise(batch_X: torch.Tensor,
+                            attributions: torch.Tensor,
+                            concept_idx: Union[torch.Tensor, int],
+                            pcbm_net: CBM_Net):
+
         if isinstance(concept_idx, int):
             return attributions.squeeze(0)
-        
-        with torch.no_grad():
-            max_concept_idx = pcbm_net(batch_X)[0, concept_idx].argmax()
-        return attributions[max_concept_idx]
-    
+
+        # attributions shape is typically [num_selected_concepts, 1, H, W]
+        scores = attributions.abs().mean(dim=(1, 2, 3))
+        best_idx = scores.argmax()
+
+        return attributions[best_idx]
+
     @staticmethod
     def max_pooling_channel_wise(batch_X:torch.Tensor,
                                attributions:torch.Tensor,

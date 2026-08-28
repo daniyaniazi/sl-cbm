@@ -95,7 +95,7 @@ def load_dataset(
             dataset=args.dataset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
-            dataset_scalar=args.dataset_scalar,
+             dataset_scalar=getattr(args, "dataset_scalar", None),
         )
 
     if args.dataset == "cifar10":
@@ -697,7 +697,7 @@ def load_dataset(
         train_loader = None
         test_loader = DataLoader(wrapped_celebA(testset), batch_size=args.batch_size, shuffle=False, num_workers=16)
 
-    elif args.dataset == "spss_awa2":
+    elif args.dataset in ["awa2", "spss_awa2"]:
         import pickle
         from torch.utils.data import Dataset
 
@@ -1078,13 +1078,35 @@ def build_pcbm_model(
             num_of_classes,
         )
 
+    # elif args.pcbm_arch == "spss_pcbm":
+    #     model = spss_pcbm(
+    #         model_context.normalizer,
+    #         model_context.concept_bank,
+    #         model_context.backbone,
+    #         False,
+    #         num_of_classes,
+    #     )
+
+
     elif args.pcbm_arch == "spss_pcbm":
+
+        print("[DEBUG BEFORE SPSP] num_of_classes =", num_of_classes)
+
+        import inspect
+        print("[DEBUG SPSP SIGNATURE] =", inspect.signature(spss_pcbm))
+
         model = spss_pcbm(
-            model_context.normalizer,
-            model_context.concept_bank,
-            model_context.backbone,
-            False,
-            num_of_classes,
+            normalizer=model_context.normalizer,
+            concept_bank=model_context.concept_bank,
+            backbone=model_context.backbone,
+            pooling_type="simpool",
+            concept_softmax=False,
+            num_of_classes=num_of_classes,
+        )
+
+        print(
+            "[DEBUG AFTER SPSP] classifier shape =",
+            model.classifier[1].weight.shape
         )
 
     elif args.pcbm_arch == "spmss_pcbm":
@@ -1129,9 +1151,25 @@ def load_model_pipeline(args: argparse.Namespace, load_pcbm:bool = True):
     )
 
     if load_pcbm:
+
+        # AwA2 always has 50 task classes
+        if args.dataset in ["awa2", "spss_awa2"]:
+            num_of_classes = 50
+        else:
+            num_of_classes = len(dataset.idx_to_class)
+
+        print(f"[DEBUG] dataset={args.dataset}")
+        print(f"[DEBUG] len(dataset.idx_to_class)={len(dataset.idx_to_class)}")
+        print(f"[DEBUG] constructing model with num_of_classes={num_of_classes}")
+
         pcbm_model = build_pcbm_model(
-            args, model_context=model_context, num_of_classes=dataset.idx_to_class.__len__()
+            args,
+            model_context=model_context,
+            num_of_classes=num_of_classes
         )
+        # pcbm_model = build_pcbm_model(
+        #     args, model_context=model_context, num_of_classes=dataset.idx_to_class.__len__()
+        # )
         return concept_bank, backbone, dataset, model_context, pcbm_model
         
         
