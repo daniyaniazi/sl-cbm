@@ -146,18 +146,20 @@ def main(args:argparse.Namespace):
                                                                         model = model)
     explain_algorithm_forward:Callable = getattr(model_explain_algorithm_forward, args.explain_method)
     attribution_pooling:Callable[..., torch.Tensor] = getattr(attribution_pooling_forward, args.concept_pooling)
-    targeted_concept_idx = getattr(
-        concept_select_func,
-        args.dataset
-    )(
-        model_context,
-        args.concept_target
-    )
 
-    if isinstance(targeted_concept_idx, torch.Tensor):
-        targeted_concept_idx = targeted_concept_idx.to(args.device)
+    # only resolve concept target when not in per-sample top-k mode
+    targeted_concept_idx = None
+    if args.top_k == 0:
+        targeted_concept_idx = getattr(concept_select_func, args.dataset)(model_context, args.concept_target)
+        if isinstance(targeted_concept_idx, torch.Tensor):
+            targeted_concept_idx = targeted_concept_idx.to(args.device)
+        args.logger.info(targeted_concept_idx)
 
-    args.logger.info(targeted_concept_idx)
+    # build concept name list for metadata
+    if hasattr(concept_bank, 'concept_names'):
+        concept_names_list = concept_bank.concept_names
+    else:
+        concept_names_list = [str(k) for k in concept_bank.keys()]
 
     # load sample ID filter if provided
     sample_ids = None
@@ -166,37 +168,45 @@ def main(args:argparse.Namespace):
             sample_ids = set(line.strip() for line in f if line.strip())
         args.logger.info(f"Filtering to {len(sample_ids)} sample IDs from {args.sample_ids}")
 
-    count = 0
-    for idx, data in tqdm(enumerate(dataset.test_loader),
-                          total=dataset.test_loader.__len__()):
-        # batch_X, batch_Y = data
-        if len(data) == 3:
-            batch_X, batch_Y, _ = data
+    def _get_img_id(loader, idx):
+        ds = loader.dataset
+        if hasattr(ds, 'samples'):
+            img_path = ds.samples[idx][0]
+        elif hasattr(ds, 'data') and isinstance(ds.data[idx], dict):
+            img_path = ds.data[idx]['img_path']
         else:
-            batch_X, batch_Y = data
-        batch_X:torch.Tensor = batch_X.to(args.device)
-        batch_Y:torch.Tensor = batch_Y.to(args.device)
+            return str(idx)
+        return os.path.splitext(os.path.basename(img_path))[0]
 
-        # filter by sample ID — match filename stem against provided list
-        # if sample_ids is not None:
-        #     img_path = dataset.test_loader.dataset.samples[idx][0]
-        #     img_id = os.path.splitext(os.path.basename(img_path))[0]
-        #     if img_id not in sample_ids:
-        #         continue
-        if sample_ids is not None:
+    def _heatmap_for_concept(batch_X_req, concept_int_idx):
+        attr = explain_algorithm_forward(batch_X=batch_X_req,
+                                         explain_algorithm=explain_algorithm,
+                                         target=concept_int_idx)
+        attr = attribution_pooling(batch_X=batch_X_req,
+                                   attributions=attr,
+                                   concept_idx=concept_int_idx,
+                                   pcbm_net=model)
+        return attr
 
-            if args.dataset in ["awa2", "cub"]:
-                img_path = dataset.test_loader.dataset.data[idx]["img_path"]
-            else:
-                img_path = dataset.test_loader.dataset.samples[idx][0]
+    # when sample_ids are provided, search test + train loaders so val-split images are found too
+    loaders = [dataset.test_loader]
+    if sample_ids is not None and hasattr(dataset, 'train_loader') and dataset.train_loader is not None:
+        loaders.append(dataset.train_loader)
 
-            img_id = os.path.splitext(
-                os.path.basename(img_path)
-            )[0]
+    count = 0
+    done = False
+    for loader in loaders:
+        if done:
+            break
+        for idx, data in tqdm(enumerate(loader), total=len(loader)):
+            # AwA2 returns (img, label, attrs); CUB returns (img, label)
+            batch_X = data[0].to(args.device)
+            batch_Y = data[1].to(args.device)
 
-            if img_id not in sample_ids:
+            img_id = _get_img_id(loader, idx)
+
+            if sample_ids is not None and img_id not in sample_ids:
                 continue
-        
 
             if args.class_target != "" and dataset.idx_to_class[batch_Y.item()] != args.class_target:
                 continue
@@ -207,7 +217,6 @@ def main(args:argparse.Namespace):
                     done = True
                     break
 
-                # forward pass: get concept scores + predicted class
                 with torch.no_grad():
                     fwd = model(batch_X)
                     class_logits, concept_scores = fwd[0], fwd[1]
@@ -231,13 +240,11 @@ def main(args:argparse.Namespace):
                     attr = _heatmap_for_concept(batch_X_g, c_idx)
                     heatmaps[c_idx] = attr.detach().cpu()
                     c_name = str(concept_names_list[c_idx])
-                    # viz_attn also saves original; we rename/skip the duplicate
                     viz_attn(batch_X_g.detach(),
                              attr,
                              blur=True,
                              prefix=f"rank{rank:02d}_{c_name}",
                              save_to=save_to)
-                    # remove the duplicate original saved by viz_attn
                     dup = os.path.join(save_to, f"rank{rank:02d}_{c_name}-original_image.jpg")
                     if os.path.exists(dup):
                         os.remove(dup)
@@ -269,12 +276,11 @@ def main(args:argparse.Namespace):
             attributions:torch.Tensor = explain_algorithm_forward(batch_X=batch_X,
                                                                   explain_algorithm=explain_algorithm,
                                                                   target=targeted_concept_idx)
-            attributions = attribution_pooling(batch_X = batch_X,
-                                               attributions = attributions,
-                                               concept_idx = targeted_concept_idx,
-                                               pcbm_net = model)
+            attributions = attribution_pooling(batch_X=batch_X,
+                                               attributions=attributions,
+                                               concept_idx=targeted_concept_idx,
+                                               pcbm_net=model)
 
-            # forward pass for concept scores and predicted class (no grad needed)
             with torch.no_grad():
                 fwd = model(batch_X.detach())
                 class_logits, concept_scores = fwd[0], fwd[1]
@@ -300,7 +306,6 @@ def main(args:argparse.Namespace):
                 except:
                     pass
 
-                # save structured .pt dict
                 concept_idx_val = targeted_concept_idx.tolist() if isinstance(targeted_concept_idx, torch.Tensor) else targeted_concept_idx
                 torch.save({
                     "fname": img_id,
@@ -320,10 +325,7 @@ def main(args:argparse.Namespace):
                 for i in range(batch_Y.size(0)):
                     print(f"ground truth: {dataset.idx_to_class[batch_Y[i].item()]}")
                 topK_concept_to_name(args, model, batch_X)
-                viz_attn(batch_X,
-                        attributions,
-                        blur=True,
-                        save_to=None)
+                viz_attn(batch_X, attributions, blur=True, save_to=None)
                 captum_vis_attn(batch_X,
                             attributions,
                             title=f"{dataset.idx_to_class[batch_Y.item()]}-attributions: {args.concept_target}",
