@@ -104,6 +104,8 @@ def main(args:argparse.Namespace):
 
     if args.top_k == 0:
         targeted_concept_idx = getattr(concept_select_func, args.dataset)(model_context, args.concept_target)
+        if isinstance(targeted_concept_idx, torch.Tensor):
+            targeted_concept_idx = targeted_concept_idx.to(args.device)
         args.logger.info(targeted_concept_idx)
 
     # build concept name list for metadata
