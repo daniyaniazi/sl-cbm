@@ -68,27 +68,72 @@ class concept_select_func:
         targeted_concept_idx = model_context.concept_bank.concept_names.index(concept_target)
         return targeted_concept_idx
     
+    # @staticmethod
+    # def cub(model_context: model_pipeline,
+    #             concept_target:str):
+    #     if hasattr(CUB_features, concept_target):
+    #         # trick to get the device of a nn.Module
+    #         return torch.arange(getattr(CUB_features, concept_target)[0], getattr(CUB_features, concept_target)[1] + 1)\
+    #             .to(next(model_context.posthoc_layer.parameters()).device)
+        
+    #     return model_context.concept_bank.concept_names.index(int(concept_target))
     @staticmethod
     def cub(model_context: model_pipeline,
-                concept_target:str):
+            concept_target: str):
+
         if hasattr(CUB_features, concept_target):
-            # trick to get the device of a nn.Module
-            return torch.arange(getattr(CUB_features, concept_target)[0], getattr(CUB_features, concept_target)[1] + 1)\
-                .to(next(model_context.posthoc_layer.parameters()).device)
-        
-        return model_context.concept_bank.concept_names.index(int(concept_target))
-    
+
+            # Original CUB attribute range, e.g.
+            # has_breast_color = (105, 119)
+            lo, hi = getattr(CUB_features, concept_target)
+
+            # Concept bank contains only the 112 attributes
+            # selected by part_mask.
+            selected_bank_indices = []
+
+            for bank_idx, original_attr_idx in enumerate(CUB_features.part_mask):
+                if lo <= original_attr_idx <= hi:
+                    selected_bank_indices.append(bank_idx)
+
+            if len(selected_bank_indices) == 0:
+                raise ValueError(
+                    f"No concepts from group '{concept_target}' "
+                    f"exist in CUB_features.part_mask"
+                )
+
+            return torch.tensor(
+                selected_bank_indices,
+                dtype=torch.long
+            )
+
+        # Individual concept-bank index
+        return model_context.concept_bank.concept_names.index(
+            int(concept_target)
+        )
     @staticmethod
     def rival10(model_context: model_pipeline,
                 concept_target:str):
         targeted_concept_idx = model_context.concept_bank.concept_names.index(concept_target)
         return targeted_concept_idx
 
+    # @staticmethod
+    # def awa2(model_context: model_pipeline,
+    #          concept_target: str):
+    #     # AwA2 concepts are single named attributes (e.g. "black", "furry")
+    #     return model_context.concept_bank.concept_names.index(concept_target)
     @staticmethod
     def awa2(model_context: model_pipeline,
-             concept_target: str):
-        # AwA2 concepts are single named attributes (e.g. "black", "furry")
-        return model_context.concept_bank.concept_names.index(concept_target)
+            concept_target: str):
+
+        for idx, name in enumerate(model_context.concept_bank.concept_names):
+            clean_name = name.split("\t")[-1].strip()
+
+            if clean_name == concept_target:
+                return idx
+
+        raise ValueError(
+            f"AwA2 concept '{concept_target}' not found"
+        )
     
     
 def main(args:argparse.Namespace):
@@ -101,18 +146,18 @@ def main(args:argparse.Namespace):
                                                                         model = model)
     explain_algorithm_forward:Callable = getattr(model_explain_algorithm_forward, args.explain_method)
     attribution_pooling:Callable[..., torch.Tensor] = getattr(attribution_pooling_forward, args.concept_pooling)
+    targeted_concept_idx = getattr(
+        concept_select_func,
+        args.dataset
+    )(
+        model_context,
+        args.concept_target
+    )
 
-    if args.top_k == 0:
-        targeted_concept_idx = getattr(concept_select_func, args.dataset)(model_context, args.concept_target)
-        if isinstance(targeted_concept_idx, torch.Tensor):
-            targeted_concept_idx = targeted_concept_idx.to(args.device)
-        args.logger.info(targeted_concept_idx)
+    if isinstance(targeted_concept_idx, torch.Tensor):
+        targeted_concept_idx = targeted_concept_idx.to(args.device)
 
-    # build concept name list for metadata
-    if hasattr(concept_bank, 'concept_names'):
-        concept_names_list = concept_bank.concept_names
-    else:
-        concept_names_list = [str(k) for k in concept_bank.keys()]
+    args.logger.info(targeted_concept_idx)
 
     # load sample ID filter if provided
     sample_ids = None
@@ -121,47 +166,37 @@ def main(args:argparse.Namespace):
             sample_ids = set(line.strip() for line in f if line.strip())
         args.logger.info(f"Filtering to {len(sample_ids)} sample IDs from {args.sample_ids}")
 
-    def _get_img_id(loader, idx):
-        ds = loader.dataset
-        if hasattr(ds, 'samples'):
-            img_path = ds.samples[idx][0]
-        elif hasattr(ds, 'data') and isinstance(ds.data[idx], dict):
-            img_path = ds.data[idx]['img_path']
-        else:
-            return str(idx)
-        return os.path.splitext(os.path.basename(img_path))[0]
-
-    def _heatmap_for_concept(batch_X_req, concept_int_idx):
-        """Compute and return attribution for one concept index (int)."""
-        attr = explain_algorithm_forward(batch_X=batch_X_req,
-                                         explain_algorithm=explain_algorithm,
-                                         target=concept_int_idx)
-        attr = attribution_pooling(batch_X=batch_X_req,
-                                   attributions=attr,
-                                   concept_idx=concept_int_idx,
-                                   pcbm_net=model)
-        return attr
-
-    # when sample_ids are provided, search test + train loaders so val-split images are found too
-    loaders = [dataset.test_loader]
-    if sample_ids is not None and hasattr(dataset, 'train_loader') and dataset.train_loader is not None:
-        loaders.append(dataset.train_loader)
-
     count = 0
-    done = False
-    for loader in loaders:
-        if done:
-            break
-        for idx, data in tqdm(enumerate(loader), total=len(loader)):
-            # AwA2 returns (img, label, attrs); CUB returns (img, label)
-            batch_X = data[0].to(args.device)
-            batch_Y = data[1].to(args.device)
+    for idx, data in tqdm(enumerate(dataset.test_loader),
+                          total=dataset.test_loader.__len__()):
+        # batch_X, batch_Y = data
+        if len(data) == 3:
+            batch_X, batch_Y, _ = data
+        else:
+            batch_X, batch_Y = data
+        batch_X:torch.Tensor = batch_X.to(args.device)
+        batch_Y:torch.Tensor = batch_Y.to(args.device)
 
-            img_id = _get_img_id(loader, idx)
+        # filter by sample ID — match filename stem against provided list
+        # if sample_ids is not None:
+        #     img_path = dataset.test_loader.dataset.samples[idx][0]
+        #     img_id = os.path.splitext(os.path.basename(img_path))[0]
+        #     if img_id not in sample_ids:
+        #         continue
+        if sample_ids is not None:
 
-            # filter by sample ID if provided
-            if sample_ids is not None and img_id not in sample_ids:
+            if args.dataset in ["awa2", "cub"]:
+                img_path = dataset.test_loader.dataset.data[idx]["img_path"]
+            else:
+                img_path = dataset.test_loader.dataset.samples[idx][0]
+
+            img_id = os.path.splitext(
+                os.path.basename(img_path)
+            )[0]
+
+            if img_id not in sample_ids:
                 continue
+        
 
             if args.class_target != "" and dataset.idx_to_class[batch_Y.item()] != args.class_target:
                 continue
