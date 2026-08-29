@@ -148,8 +148,9 @@ def main(args:argparse.Namespace):
     attribution_pooling:Callable[..., torch.Tensor] = getattr(attribution_pooling_forward, args.concept_pooling)
 
     # class-level GradCAM: same backbone layer, but forward returns class logits
+    # Always use layer_grad_cam for class, regardless of which concept explain method is used.
     class_explain_algorithm = None
-    if args.top_k > 0 and args.explain_method == "layer_grad_cam":
+    if args.top_k > 0:
         try:
             class_explain_algorithm = model_explain_algorithm_factory.layer_grad_cam(
                 forward_func=lambda x: model(x)[0],
