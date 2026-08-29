@@ -203,20 +203,24 @@ def main(args:argparse.Namespace):
                                    pcbm_net=model)
         return attr
 
-    # when sample_ids are provided, search test + train loaders so val-split images are found too
-    # train_loader is always created with shuffle=True — recreate it with shuffle=False so that
-    # enumerate(loader) idx correctly maps to dataset.data[idx] / dataset.samples[idx]
-    loaders = [dataset.test_loader]
-    if sample_ids is not None and hasattr(dataset, 'train_loader') and dataset.train_loader is not None:
-        from torch.utils.data import DataLoader as _DL
-        train_loader_noshuffle = _DL(
-            dataset.train_loader.dataset,
+    # Recreate loaders with shuffle=False and no custom sampler so that
+    # enumerate(loader) idx == ds.data[idx] / ds.samples[idx].
+    # CUB test_loader uses resampling=True (custom sampler) and train_loader uses
+    # shuffle=True — both break the idx↔sample mapping without this fix.
+    from torch.utils.data import DataLoader as _DL
+
+    def _sequential_loader(orig_loader):
+        return _DL(
+            orig_loader.dataset,
             batch_size=1,
             shuffle=False,
-            num_workers=dataset.train_loader.num_workers,
+            num_workers=orig_loader.num_workers,
             drop_last=False,
         )
-        loaders.append(train_loader_noshuffle)
+
+    loaders = [_sequential_loader(dataset.test_loader)]
+    if sample_ids is not None and hasattr(dataset, 'train_loader') and dataset.train_loader is not None:
+        loaders.append(_sequential_loader(dataset.train_loader))
 
     count = 0
     done = False
