@@ -147,6 +147,17 @@ def main(args:argparse.Namespace):
     explain_algorithm_forward:Callable = getattr(model_explain_algorithm_forward, args.explain_method)
     attribution_pooling:Callable[..., torch.Tensor] = getattr(attribution_pooling_forward, args.concept_pooling)
 
+    # class-level GradCAM: same backbone layer, but forward returns class logits
+    class_explain_algorithm = None
+    if args.top_k > 0 and args.explain_method == "layer_grad_cam":
+        try:
+            class_explain_algorithm = model_explain_algorithm_factory.layer_grad_cam(
+                forward_func=lambda x: model(x)[0],
+                model=model,
+            )
+        except Exception as e:
+            args.logger.warning(f"Could not build class GradCAM: {e}")
+
     # only resolve concept target when not in per-sample top-k mode
     targeted_concept_idx = None
     if args.top_k == 0:
@@ -168,15 +179,19 @@ def main(args:argparse.Namespace):
             sample_ids = set(line.strip() for line in f if line.strip())
         args.logger.info(f"Filtering to {len(sample_ids)} sample IDs from {args.sample_ids}")
 
-    def _get_img_id(loader, idx):
+    def _get_img_path(loader, idx):
         ds = loader.dataset
         if hasattr(ds, 'samples'):
-            img_path = ds.samples[idx][0]
+            return ds.samples[idx][0]
         elif hasattr(ds, 'data') and isinstance(ds.data[idx], dict):
-            img_path = ds.data[idx]['img_path']
-        else:
+            return ds.data[idx]['img_path']
+        return None
+
+    def _get_img_id(loader, idx):
+        p = _get_img_path(loader, idx)
+        if p is None:
             return str(idx)
-        return os.path.splitext(os.path.basename(img_path))[0]
+        return os.path.splitext(os.path.basename(p))[0]
 
     def _heatmap_for_concept(batch_X_req, concept_int_idx):
         attr = explain_algorithm_forward(batch_X=batch_X_req,
@@ -189,9 +204,19 @@ def main(args:argparse.Namespace):
         return attr
 
     # when sample_ids are provided, search test + train loaders so val-split images are found too
+    # train_loader is always created with shuffle=True — recreate it with shuffle=False so that
+    # enumerate(loader) idx correctly maps to dataset.data[idx] / dataset.samples[idx]
     loaders = [dataset.test_loader]
     if sample_ids is not None and hasattr(dataset, 'train_loader') and dataset.train_loader is not None:
-        loaders.append(dataset.train_loader)
+        from torch.utils.data import DataLoader as _DL
+        train_loader_noshuffle = _DL(
+            dataset.train_loader.dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=dataset.train_loader.num_workers,
+            drop_last=False,
+        )
+        loaders.append(train_loader_noshuffle)
 
     count = 0
     done = False
@@ -227,12 +252,44 @@ def main(args:argparse.Namespace):
                 save_to = os.path.join(args.save_path, f"{args.explain_method}/{img_id}")
                 os.makedirs(save_to, exist_ok=True)
 
-                # save original image once
-                from utils.visual_utils import reduce_tensor_as_numpy
+                # load unnormalized tensor from disk for correct overlays + save original
                 from PIL import Image as PILImage
-                orig_np = reduce_tensor_as_numpy(batch_X.detach())
-                PILImage.fromarray((orig_np * 255).astype(np.uint8)).save(
-                    os.path.join(save_to, f"{img_id}-original.jpg"))
+                import torchvision.transforms.functional as TF
+                raw_path = _get_img_path(loader, idx)
+                H, W = batch_X.size(-2), batch_X.size(-1)
+                if raw_path and os.path.exists(raw_path):
+                    orig_pil = PILImage.open(raw_path).convert('RGB').resize((W, H))
+                    orig_pil.save(os.path.join(save_to, f"{img_id}-original.jpg"))
+                    orig_tensor = TF.to_tensor(orig_pil).unsqueeze(0)
+                else:
+                    from utils.visual_utils import reduce_tensor_as_numpy
+                    orig_np = reduce_tensor_as_numpy(batch_X.detach())
+                    PILImage.fromarray((orig_np * 255).astype(np.uint8)).save(
+                        os.path.join(save_to, f"{img_id}-original.jpg"))
+                    orig_tensor = batch_X.detach().cpu()
+
+                # class-level GradCAM
+                class_heatmap = None
+                if class_explain_algorithm is not None:
+                    try:
+                        batch_X_cls = batch_X.detach().requires_grad_(True)
+                        cls_attr = class_explain_algorithm.attribute(batch_X_cls, target=predicted_class_idx)
+                        cls_attr = LayerAttribution.interpolate(cls_attr, batch_X.size()[-2:], interpolate_mode="bicubic")
+                        class_heatmap = cls_attr.detach().cpu()
+                        pred_name = dataset.idx_to_class[predicted_class_idx]
+                        viz_attn(orig_tensor, cls_attr, blur=True,
+                                 prefix=f"class_{pred_name}", save_to=save_to)
+                        dup = os.path.join(save_to, f"class_{pred_name}-original_image.jpg")
+                        if os.path.exists(dup):
+                            os.remove(dup)
+                        try:
+                            captum_vis_attn(orig_tensor, cls_attr,
+                                            title=f"class GradCAM: {pred_name}",
+                                            save_to=os.path.join(save_to, f"class_{pred_name}-captum.jpg"))
+                        except:
+                            pass
+                    except Exception as e:
+                        args.logger.warning(f"Class GradCAM failed for {img_id}: {e}")
 
                 heatmaps = {}
                 for rank, c_idx in enumerate(top_k_indices):
@@ -240,7 +297,7 @@ def main(args:argparse.Namespace):
                     attr = _heatmap_for_concept(batch_X_g, c_idx)
                     heatmaps[c_idx] = attr.detach().cpu()
                     c_name = str(concept_names_list[c_idx])
-                    viz_attn(batch_X_g.detach(),
+                    viz_attn(orig_tensor,
                              attr,
                              blur=True,
                              prefix=f"rank{rank:02d}_{c_name}",
@@ -249,7 +306,7 @@ def main(args:argparse.Namespace):
                     if os.path.exists(dup):
                         os.remove(dup)
                     try:
-                        captum_vis_attn(batch_X_g.detach(),
+                        captum_vis_attn(orig_tensor,
                                         attr,
                                         title=f"{dataset.idx_to_class[batch_Y.item()]} | rank{rank} {c_name}",
                                         save_to=os.path.join(save_to, f"rank{rank:02d}_{c_name}-captum.jpg"))
@@ -265,6 +322,7 @@ def main(args:argparse.Namespace):
                     "top_concepts": top_k_indices,
                     "top_concept_names": top_concept_names,
                     "heatmaps": heatmaps,
+                    "class_heatmap": class_heatmap,
                 }, os.path.join(save_to, f"{img_id}.pt"))
 
                 count += 1
